@@ -1,0 +1,17 @@
+# Секрети — ніколи не комітити
+.env
+
+# Віртуальне оточення
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Логи
+*.log
+
+# IDE
+.vscode/
+.idea/
