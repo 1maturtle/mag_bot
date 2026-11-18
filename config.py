@@ -30,8 +30,9 @@ SUPABASE_KEY: str = _require("SUPABASE_KEY")
 # Ключ API для Google Gemini (починається з "AIza", береться на aistudio.google.com/apikey)
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
 
-# Модель Gemini (gemini-1.5-flash вже вимкнена Google, тому за замовчуванням 2.5)
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Модель Gemini. Lite-модель — найшвидша й найекономніша для безкоштовного тарифу.
+# (gemini-1.5 та gemini-2.5-flash-lite Google для нових користувачів уже закрив)
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 # Часовий пояс для планувальника нагадувань
 TIMEZONE: str = os.getenv("TIMEZONE", "Europe/Kiev")

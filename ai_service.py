@@ -8,6 +8,7 @@
 #   - Витягування структурованих даних завдання з аудіо
 # ======================================
 
+import html
 import json
 import logging
 import re
@@ -35,6 +36,15 @@ _MULTIMODAL_CONFIG = types.GenerateContentConfig(
     temperature=0.2,  # Нижча температура для точної транскрипції
     max_output_tokens=8192,
 )
+
+
+def to_telegram_html(text: str) -> str:
+    """
+    Готує текст від Gemini до надсилання з parse_mode=HTML:
+    екранує <, >, & і перетворює Markdown-жирний **текст** на <b>текст</b>.
+    """
+    safe = html.escape(text)
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe, flags=re.DOTALL)
 
 
 async def _generate(contents, config: types.GenerateContentConfig) -> str:

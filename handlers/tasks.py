@@ -515,7 +515,7 @@ async def handle_quiz_answer(callback: CallbackQuery, state: FSMContext) -> None
     # Вимикаємо кнопки попереднього питання
     await callback.message.edit_reply_markup(reply_markup=None)
 
-    await callback.message.answer(escape(feedback))
+    await callback.message.answer(ai.to_telegram_html(feedback))
     await callback.answer()
 
     # Оновлюємо стан
@@ -549,7 +549,7 @@ async def _finish_quiz(message: Message, state: FSMContext) -> None:
     result_text = (
         f"🏁 <b>Тест завершено!</b>\n\n"
         f"📊 Результат: <b>{score}/{total}</b> ({percentage}%)\n\n"
-        f"{escape(final_feedback)}"
+        f"{ai.to_telegram_html(final_feedback)}"
     )
 
     await message.answer(
@@ -563,9 +563,9 @@ async def _finish_quiz(message: Message, state: FSMContext) -> None:
         try:
             await db.save_quiz_result(
                 telegram_id=telegram_id,
-                score=percentage,
-                feedback=final_feedback,
-                task_id=task_id,
+                topic=subject,
+                score=score,
+                total_questions=total,
             )
         except Exception as e:
             logger.error(f"Помилка збереження результату тесту: {e}")
@@ -591,8 +591,8 @@ async def handle_my_progress(message: Message) -> None:
     tasks_count = len(tasks)
 
     if quiz_history:
-        avg_score = round(sum(q["score"] for q in quiz_history) / len(quiz_history))
-        best_score = max(q["score"] for q in quiz_history)
+        avg_score = round(sum(q["percent"] for q in quiz_history) / len(quiz_history))
+        best_score = max(q["percent"] for q in quiz_history)
     else:
         avg_score = 0
         best_score = 0
@@ -608,8 +608,12 @@ async def handle_my_progress(message: Message) -> None:
     if quiz_history:
         progress_text += "\n<b>Останні тести:</b>\n"
         for result in quiz_history:
-            created = result.get("created_at", "")[:10]
-            progress_text += f"  • {result['score']}% — {created}\n"
+            created = (result.get("created_at") or "")[:10]
+            topic = escape(result.get("topic") or "")
+            progress_text += (
+                f"  • {topic}: {result['score']}/{result.get('total_questions') or 0} "
+                f"({result['percent']}%) — {created}\n"
+            )
 
     if not quiz_history:
         progress_text += "\n<i>Ще немає результатів тестів. Пройди перший тест!</i>"

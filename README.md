@@ -96,7 +96,7 @@ python main.py
 | `BOT_TOKEN` | [@BotFather](https://t.me/BotFather) у Telegram → `/newbot` |
 | `SUPABASE_URL` | Supabase Dashboard → Settings → API → Project URL |
 | `SUPABASE_KEY` | Supabase Dashboard → Settings → API Keys → **Secret key** (`sb_secret_...`) або legacy `service_role`. Publishable (`sb_publishable_...`) не підійде |
-| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) — ключ починається з `AIza` |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) — ключ формату `AQ.…` або `AIza…` |
 
 ## 🗄️ Схема бази даних
 
@@ -116,7 +116,7 @@ created_at      deadline           feedback
 
 1. Користувач натискає **🎤 Голосове завдання** або надсилає голосове повідомлення
 2. Бот завантажує `.ogg` файл через Telegram Bot API
-3. Аудіо передається в **Gemini** (за замовчуванням `gemini-2.5-flash`, змінюється через `GEMINI_MODEL`) напряму в запиті
+3. Аудіо передається в **Gemini** (за замовчуванням `gemini-3.5-flash-lite`, змінюється через `GEMINI_MODEL`) напряму в запиті
 4. Gemini транскрибує мовлення та витягує:
    - 📖 Предмет (Математика, Фізика, тощо)
    - 📝 Опис завдання
