@@ -27,6 +27,7 @@ from aiogram.types import (
 
 import database as db
 import ai_service as ai
+from deadlines import parse_deadline_text, validate_deadline, deadline_hint
 from states import AddTaskStates, QuizStates
 from handlers.start import get_main_menu
 
@@ -174,7 +175,7 @@ async def handle_add_task_start(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.message(AddTaskStates.waiting_for_subject, F.text)
+@router.message(AddTaskStates.waiting_for_subject, F.text, ~F.text.startswith("/"))
 async def handle_task_subject(message: Message, state: FSMContext) -> None:
     """
     Отримує назву предмета та переходить до кроку опису.
@@ -201,7 +202,7 @@ async def handle_task_subject(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.message(AddTaskStates.waiting_for_description, F.text)
+@router.message(AddTaskStates.waiting_for_description, F.text, ~F.text.startswith("/"))
 async def handle_task_description(message: Message, state: FSMContext) -> None:
     """
     Отримує опис завдання та переходить до кроку дедлайну.
@@ -219,14 +220,13 @@ async def handle_task_description(message: Message, state: FSMContext) -> None:
     await state.set_state(AddTaskStates.waiting_for_deadline)
 
     await message.answer(
-        "Крок 3/3 — Введи <b>дедлайн</b>:\n"
-        "<i>Формати: 25.10.2024, 25.10.2024 15:00, або просто 'завтра', 'в п'ятницю'</i>",
+        "Крок 3/3 — Введи <b>дедлайн</b>:\n" + deadline_hint(),
         parse_mode="HTML",
         reply_markup=get_cancel_keyboard(),
     )
 
 
-@router.message(AddTaskStates.waiting_for_deadline, F.text)
+@router.message(AddTaskStates.waiting_for_deadline, F.text, ~F.text.startswith("/"))
 async def handle_task_deadline(message: Message, state: FSMContext) -> None:
     """
     Отримує дедлайн, парсить його та зберігає завдання в базу даних.
@@ -238,11 +238,11 @@ async def handle_task_deadline(message: Message, state: FSMContext) -> None:
     deadline_text = message.text.strip()
     data = await state.get_data()
 
-    # Намагаємось розпарсити дедлайн
-    deadline_dt = _try_parse_deadline(deadline_text)
+    # Намагаємось розпарсити дедлайн стандартними форматами
+    deadline_dt = parse_deadline_text(deadline_text)
 
     if deadline_dt is None:
-        # Якщо не вдалось парсити стандартно — просимо Gemini
+        # Якщо не вдалось — просимо Gemini ("в п'ятницю", "через тиждень" тощо)
         await message.answer("⏳ Розпізнаю дату...")
         iso_str = await ai.parse_deadline_to_datetime(deadline_text)
         if iso_str:
@@ -253,10 +253,15 @@ async def handle_task_deadline(message: Message, state: FSMContext) -> None:
 
     if deadline_dt is None:
         await message.answer(
-            "⚠️ Не вдалось розпізнати дату. Спробуй формат <b>ДД.ММ.РРРР</b> "
-            "або <b>ДД.ММ.РРРР ГГ:ХХ</b>",
+            "⚠️ Не вдалось розпізнати дату. Спробуй ще раз:\n" + deadline_hint(),
             parse_mode="HTML",
         )
+        return
+
+    # Дедлайн має бути актуальним: не в минулому і не далі ніж на рік
+    error = validate_deadline(deadline_dt)
+    if error:
+        await message.answer(error, parse_mode="HTML")
         return
 
     # Зберігаємо завдання
@@ -289,34 +294,6 @@ async def handle_task_deadline(message: Message, state: FSMContext) -> None:
             "❌ Виникла помилка при збереженні завдання. Спробуй ще раз.",
             reply_markup=get_main_menu(),
         )
-
-
-def _try_parse_deadline(text: str) -> Optional[datetime]:
-    """
-    Намагається розпарсити текст дедлайну стандартними форматами.
-
-    Args:
-        text: Текстовий рядок з датою.
-
-    Returns:
-        Об'єкт datetime або None.
-    """
-    formats = [
-        "%d.%m.%Y %H:%M",
-        "%d.%m.%Y",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-    ]
-    for fmt in formats:
-        try:
-            dt = datetime.strptime(text, fmt)
-            # Якщо час не вказано — встановлюємо 23:59
-            if fmt in ("%d.%m.%Y", "%Y-%m-%d"):
-                dt = dt.replace(hour=23, minute=59)
-            return dt
-        except ValueError:
-            continue
-    return None
 
 
 # ──────────────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ from aiogram.types import (
 
 import database as db
 import ai_service as ai
+from deadlines import parse_deadline_text, validate_deadline
 from states import VoiceTaskStates
 from handlers.start import get_main_menu
 
@@ -130,26 +131,33 @@ async def handle_voice_message(message: Message, state: FSMContext, bot: Bot) ->
         await state.clear()
         return
 
-    # Розпізнаємо дедлайн через Gemini
-    deadline_text = parsed.get("deadline_text", "не вказано")
+    # Розпізнаємо дедлайн: спершу стандартні формати, потім Gemini
+    deadline_text = (parsed.get("deadline_text") or "не вказано").strip()
     deadline_dt = None
-    deadline_display = "не визначено"
+    auto_note = "автоматично"
 
-    if deadline_text and deadline_text.lower() != "не вказано":
-        iso_str = await ai.parse_deadline_to_datetime(deadline_text)
-        if iso_str:
-            try:
-                deadline_dt = datetime.fromisoformat(iso_str)
-                deadline_display = deadline_dt.strftime("%d.%m.%Y о %H:%M")
-            except Exception:
-                deadline_display = deadline_text
-        else:
-            deadline_display = deadline_text
+    if deadline_text.lower() != "не вказано":
+        deadline_dt = parse_deadline_text(deadline_text)
+        if deadline_dt is None:
+            iso_str = await ai.parse_deadline_to_datetime(deadline_text)
+            if iso_str:
+                try:
+                    deadline_dt = datetime.fromisoformat(iso_str)
+                except Exception:
+                    deadline_dt = None
+        # Неактуальну дату (минулу або більш ніж на рік наперед) не приймаємо
+        if deadline_dt is not None and validate_deadline(deadline_dt):
+            auto_note = f"«{deadline_text}» — неактуальна дата, встановлено автоматично"
+            deadline_dt = None
 
-    # Якщо дедлайн не розпізнано — ставимо за 3 дні
-    if deadline_dt is None:
-        deadline_dt = datetime.now() + timedelta(days=3)
-        deadline_display = deadline_dt.strftime("%d.%m.%Y о %H:%M") + " (автоматично)"
+    if deadline_dt is not None:
+        deadline_display = deadline_dt.strftime("%d.%m.%Y о %H:%M")
+    else:
+        # Якщо дедлайн не розпізнано або він неактуальний — ставимо за 3 дні о 23:59
+        deadline_dt = (datetime.now() + timedelta(days=3)).replace(
+            hour=23, minute=59, second=0, microsecond=0
+        )
+        deadline_display = deadline_dt.strftime("%d.%m.%Y о %H:%M") + f" ({auto_note})"
 
     # Зберігаємо дані для підтвердження у стані FSM
     await state.update_data(

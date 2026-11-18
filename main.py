@@ -13,12 +13,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
 
 from config import BOT_TOKEN
 from scheduler import setup_scheduler
 
 # Підключаємо роутери (обробники)
-from handlers import start, tasks, voice
+from handlers import start, tasks, voice, chat
 
 # ──────────────────────────────────────────────────────────────
 # НАЛАШТУВАННЯ ЛОГУВАННЯ
@@ -75,10 +76,20 @@ async def main() -> None:
     dp.include_router(voice.router)
     # Потім роутер завдань (FSM стани, кнопки меню)
     dp.include_router(tasks.router)
-    # Останнім — стартовий роутер (команди /start, /help, /menu)
+    # Потім стартовий роутер (команди /start, /help, /menu)
     dp.include_router(start.router)
+    # Останнім — вільний чат з ШІ: отримує лише текст, який не обробили інші роутери
+    dp.include_router(chat.router)
 
-    logger.info("✅ Роутери підключено: voice → tasks → start")
+    logger.info("✅ Роутери підключено: voice → tasks → start → chat")
+
+    # ── Легенда команд у меню Telegram (кнопка «Меню» біля поля вводу) ──
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Перезапуск і головне меню"),
+        BotCommand(command="menu", description="Показати меню"),
+        BotCommand(command="new", description="Почати розмову з помічником заново"),
+        BotCommand(command="help", description="Довідка: що вміє бот"),
+    ])
 
     # ── Налаштовуємо та запускаємо планувальник ──
     scheduler = setup_scheduler(bot)
